@@ -83,11 +83,17 @@ func buildPackage(targets map[string]func() error, pkg *kang.Package) (func() er
 
 	// if this action is already present in the map, return it
 	// rather than creating a new action.
-	if a, ok := targets[pkg.ImportPath]; ok {
-		return a, nil
+	if fn, ok := targets[pkg.ImportPath]; ok {
+		return fn, nil
 	}
 
-	// step 0. are we stale ?
+	var deps []func() error
+	for _, pkg := range pkg.Imports {
+		fn, err := buildPackage(targets, pkg)
+		check(err)
+		deps = append(deps, fn)
+	}
+
 	// if this package is not stale, then by definition none of its
 	// dependencies are stale, so ignore this whole tree.
 	if !pkg.IsStale() {
@@ -98,6 +104,11 @@ func buildPackage(targets map[string]func() error, pkg *kang.Package) (func() er
 	}
 
 	return func() error {
+		for _, dep := range deps {
+			if err := dep(); err != nil {
+				return err
+			}
+		}
 		fmt.Println("building", pkg.ImportPath)
 		return nil
 	}, nil
