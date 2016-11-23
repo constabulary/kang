@@ -28,7 +28,7 @@ func main() {
 	*kangfile, err = filepath.Abs(*kangfile)
 	check(err)
 
-	rootdir := filepath.Base(*kangfile)
+	rootdir := filepath.Dir(*kangfile)
 	pkgdir := filepath.Join(rootdir, ".kang", "pkg")
 
 	ctx := &kang.Context{
@@ -38,11 +38,67 @@ func main() {
 		Pkgdir:  pkgdir,
 	}
 
-	pkgs := []*kang.Package{{
+	pkg := &kang.Package{
 		Context:    ctx,
-		ImportPath: "github.com/constabulary/kang",
-		GoFiles:    []string{"kang.go"},
-	}}
+		ImportPath: "github.com/constabulary/cmd/kang",
+		Main:       true,
+		Dir:        filepath.Join(rootdir, "cmd", "kang"),
+		GoFiles:    []string{"main.go"},
+		Imports: []*kang.Package{{
+			Context:    ctx,
+			ImportPath: "github.com/constabulary/kang",
+			Dir:        rootdir,
+			GoFiles:    []string{"kang.go"},
+		}}}
 
-	_ = pkgs
+	build(pkg)
+}
+
+func build(pkgs ...*kang.Package) {
+	targets := make(map[string]func() error)
+
+	fn, err := buildPackages(targets, pkgs)
+	check(err)
+	check(fn())
+}
+
+func buildPackages(targets map[string]func() error, pkgs []*kang.Package) (func() error, error) {
+	var deps []func() error
+	for _, pkg := range pkgs {
+		fn, err := buildPackage(targets, pkg)
+		check(err)
+		deps = append(deps, fn)
+	}
+	return func() error {
+		for _, fn := range deps {
+			if err := fn(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, nil
+}
+
+func buildPackage(targets map[string]func() error, pkg *kang.Package) (func() error, error) {
+
+	// if this action is already present in the map, return it
+	// rather than creating a new action.
+	if a, ok := targets[pkg.ImportPath]; ok {
+		return a, nil
+	}
+
+	// step 0. are we stale ?
+	// if this package is not stale, then by definition none of its
+	// dependencies are stale, so ignore this whole tree.
+	if !pkg.IsStale() {
+		return func() error {
+			fmt.Println(pkg.ImportPath, "is up to date")
+			return nil
+		}, nil
+	}
+
+	return func() error {
+		fmt.Println("building", pkg.ImportPath)
+		return nil
+	}, nil
 }

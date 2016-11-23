@@ -1,0 +1,13 @@
+language: go
+go_import_path: github.com/constabulary/kang
+go:
+  - 1.7.3
+  - tip
+
+sudo: false
+
+install:
+  - true
+
+script:
+  - make build
