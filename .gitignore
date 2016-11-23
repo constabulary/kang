@@ -25,3 +25,5 @@ _testmain.go
 
 # Editor turds
 *.swp
+
+.kang

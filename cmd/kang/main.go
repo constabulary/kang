@@ -1,6 +1,15 @@
 package main
 
-import "flag"
+import (
+	"flag"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"runtime"
+
+	"github.com/constabulary/kang"
+)
 
 func check(err error) {
 	if err != nil {
@@ -16,24 +25,24 @@ func main() {
 	workdir, err := ioutil.TempDir("", "kang")
 	check(err)
 
-	kangfile, err = filepath.Abs(kangfile)
+	*kangfile, err = filepath.Abs(*kangfile)
 	check(err)
 
-	rootdir := filepath.Base(kangfile)
+	rootdir := filepath.Base(*kangfile)
 	pkgdir := filepath.Join(rootdir, ".kang", "pkg")
 
-	ctx := &kang.Context {
-		GOOS: runtime.GOOS,
-		GOARCH: runtime.GOARCH,
+	ctx := &kang.Context{
+		GOOS:    runtime.GOOS,
+		GOARCH:  runtime.GOARCH,
 		Workdir: workdir,
-		Pkgdir: pkgdir,
+		Pkgdir:  pkgdir,
 	}
 
-	pkgs := []*Package {{
-		Contet: ctx,
+	pkgs := []*kang.Package{{
+		Context:    ctx,
 		ImportPath: "github.com/constabulary/kang",
-		GoFiles: []string{"kang.go"},
+		GoFiles:    []string{"kang.go"},
 	}}
-}
 
+	_ = pkgs
 }
