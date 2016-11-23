@@ -1,4 +1,7 @@
-build: .kang/kang-bootstrap
+build: kang
+	./$^ build
+	
+kang: .kang/kang-bootstrap
 	$^ build
 
 .kang/kang-bootstrap: .kang/bootstrap/github.com/constabulary/kang/cmd/kang.a
@@ -13,4 +16,4 @@ build: .kang/kang-bootstrap
 	go tool compile -o $@ -p github.com/constabulary/kang -complete -I .kang/bootstrap -pack kang.go
 
 clean:
-	rm -rf .kang/
+	rm -rf .kang/ kang

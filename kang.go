@@ -2,7 +2,9 @@ package kang
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -14,14 +16,22 @@ type Context struct {
 	GOOS, GOARCH string
 	Workdir      string
 	Pkgdir       string
-	force        bool // always force build, even if not stale
-	race         bool // build a -race enabled binary
+	Bindir       string
+	force        bool     // always force build, even if not stale
+	race         bool     // build a -race enabled binary
+	gcflags      []string // -gcflags
+	ldflags      []string // -ldflags
 	buildtags    []string
 }
 
 func (c *Context) isCrossCompile() bool { return false }
 
-func (c *Context) Bindir() string { return c.Workdir }
+func (c *Context) searchPaths() []string {
+	return []string{
+		c.Workdir,
+		c.Pkgdir,
+	}
+}
 
 // ctxString returns a string representation of the unique properties
 // of the context.
@@ -154,7 +164,7 @@ func (pkg *Package) pkgpath() string {
 // Binfile returns the destination of the compiled target of this command.
 func (pkg *Package) Binfile() string {
 	// TODO(dfc) should have a check for package main, or should be merged in to objfile.
-	target := filepath.Join(pkg.Bindir(), pkg.binname())
+	target := filepath.Join(pkg.Bindir, pkg.binname())
 	if pkg.testScope {
 		target = filepath.Join(pkg.Workdir, filepath.FromSlash(pkg.ImportPath), "_test", pkg.binname())
 	}
@@ -175,7 +185,7 @@ func (pkg *Package) Binfile() string {
 func (pkg *Package) binname() string {
 	switch {
 	case pkg.testScope:
-		return filepath.FromSlash(pkg.ImportPath) + ".test"
+		return pkg.name() + ".test"
 	case pkg.Main:
 		return filepath.Base(filepath.FromSlash(pkg.ImportPath))
 	default:
@@ -183,10 +193,87 @@ func (pkg *Package) binname() string {
 	}
 }
 
+func (p *Package) complete() bool {
+	return true // no cgo or runtime code
+}
+
+func (p *Package) name() string { return filepath.FromSlash(p.ImportPath) }
+
 func stringList(args ...[]string) []string {
 	var l []string
 	for _, arg := range args {
 		l = append(l, arg...)
 	}
 	return l
+}
+
+func Compile(pkg *Package) error {
+	args := append(pkg.gcflags, "-p", pkg.ImportPath, "-pack")
+	args = append(args, "-o", pkg.pkgpath())
+	for _, d := range pkg.searchPaths() {
+		args = append(args, "-I", d)
+	}
+	if pkg.standard && pkg.ImportPath == "runtime" {
+		// runtime compiles with a special gc flag to emit
+		// additional reflect type data.
+		args = append(args, "-+")
+	}
+
+	switch {
+	case pkg.complete():
+		args = append(args, "-complete")
+	}
+
+	args = append(args, pkg.GoFiles...)
+	if err := mkdir(filepath.Dir(pkg.pkgpath())); err != nil {
+		return err
+	}
+	cmd := exec.Command(filepath.Join(runtime.GOROOT(), "pkg", "tool", runtime.GOOS+"_"+runtime.GOARCH, "compile"), args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Dir = pkg.Dir
+	fmt.Fprintf(os.Stderr, "+ %s\n", strings.Join(cmd.Args, " "))
+	return cmd.Run()
+}
+
+func Link(pkg *Package) error {
+	// to ensure we don't write a partial binary, link the binary to a temporary file in
+	// in the target directory, then rename.
+	tmp, err := ioutil.TempFile(pkg.Workdir, ".kang-link")
+	if err != nil {
+		return err
+	}
+	tmp.Close()
+
+	args := append(pkg.ldflags, "-o", tmp.Name())
+	for _, d := range pkg.searchPaths() {
+		args = append(args, "-L", d)
+	}
+	args = append(args, "-buildmode", "exe")
+	args = append(args, pkg.pkgpath())
+
+	cmd := exec.Command(filepath.Join(runtime.GOROOT(), "pkg", "tool", runtime.GOOS+"_"+runtime.GOARCH, "link"), args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Dir = pkg.Workdir
+	fmt.Fprintf(os.Stderr, "+ %s\n", strings.Join(cmd.Args, " "))
+	if err := cmd.Run(); err != nil {
+		os.Remove(tmp.Name()) // remove partial file
+		return err
+	}
+	if err := mkdir(filepath.Dir(pkg.Binfile())); err != nil {
+		os.Remove(tmp.Name()) // remove partial file
+		return err
+	}
+
+	return rename(tmp.Name(), pkg.Binfile())
+}
+
+func mkdir(path string) error {
+	return os.MkdirAll(path, 0755)
+}
+
+func rename(from, to string) error {
+	fmt.Fprintf(os.Stderr, "+ mv %s %s\n", from, to)
+	return os.Rename(from, to)
 }

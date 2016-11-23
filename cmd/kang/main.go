@@ -36,6 +36,7 @@ func main() {
 		GOARCH:  runtime.GOARCH,
 		Workdir: workdir,
 		Pkgdir:  pkgdir,
+		Bindir:  rootdir,
 	}
 
 	pkg := &kang.Package{
@@ -87,13 +88,7 @@ func buildPackage(targets map[string]func() error, pkg *kang.Package) (func() er
 		return fn, nil
 	}
 
-	var deps []func() error
-	for _, pkg := range pkg.Imports {
-		fn, err := buildPackage(targets, pkg)
-		check(err)
-		deps = append(deps, fn)
-	}
-
+	// step 0. are we stale ?
 	// if this package is not stale, then by definition none of its
 	// dependencies are stale, so ignore this whole tree.
 	if !pkg.IsStale() {
@@ -103,13 +98,35 @@ func buildPackage(targets map[string]func() error, pkg *kang.Package) (func() er
 		}, nil
 	}
 
-	return func() error {
+	// step 1. build dependencies
+	var deps []func() error
+	for _, pkg := range pkg.Imports {
+		fn, err := buildPackage(targets, pkg)
+		if err != nil {
+			return nil, err
+		}
+		deps = append(deps, fn)
+	}
+
+	// step 2. build this package
+	build := func() error {
 		for _, dep := range deps {
 			if err := dep(); err != nil {
 				return err
 			}
 		}
-		fmt.Println("building", pkg.ImportPath)
-		return nil
-	}, nil
+		if err := kang.Compile(pkg); err != nil {
+			return err
+		}
+		if !pkg.Main {
+			return nil // we're done
+		}
+		return kang.Link(pkg)
+	}
+
+	// record the final action as the action that represents
+	// building this package.
+	targets[pkg.ImportPath] = build
+
+	return build, nil
 }
