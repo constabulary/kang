@@ -19,16 +19,19 @@ func check(err error) {
 }
 
 func main() {
-	kangfile := flag.String("f", ".kangfile", "path to .kangfile")
 	flag.Parse()
+	kangfile, err := findkangfile(cwd())
+	check(err)
+
+	kangfile, err = filepath.Abs(kangfile)
+	check(err)
+
+	fmt.Println("Using", kangfile)
 
 	workdir, err := ioutil.TempDir("", "kang")
 	check(err)
 
-	*kangfile, err = filepath.Abs(*kangfile)
-	check(err)
-
-	rootdir := filepath.Dir(*kangfile)
+	rootdir := filepath.Dir(kangfile)
 	pkgdir := filepath.Join(rootdir, ".kang", "pkg")
 
 	ctx := &kang.Context{
@@ -59,6 +62,35 @@ func main() {
 	pkg.NotStale = !pkg.IsStale()
 
 	build(pkg)
+}
+
+func cwd() string {
+	wd, err := os.Getwd()
+	check(err)
+	return wd
+}
+
+// findkangfile returns the location of the closest .kangfile
+// relative to the dir provided. If no .kangfile is found, an
+// error is returned.
+func findkangfile(dir string) (string, error) {
+	orig := dir
+	for {
+		path := filepath.Join(dir, ".kangfile")
+		fi, err := os.Stat(path)
+		if err == nil && !fi.IsDir() {
+			return path, nil
+		}
+		if err != nil && !os.IsNotExist(err) {
+			check(err)
+		}
+		d := filepath.Dir(dir)
+		if d == dir {
+			// got to the root directory without
+			return "", fmt.Errorf("could not locate .kangfile in %s", orig)
+		}
+		dir = d
+	}
 }
 
 func build(pkgs ...*kang.Package) {

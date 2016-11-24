@@ -35,6 +35,8 @@ The location of the `.kangfile` determines the root of a project, which is usual
 
 ## Installation
 
+kang requires Go 1.7.3 or later.
+
 kang is self hosting.
 You can either checkout the source of this repo and run
 
@@ -66,7 +68,7 @@ Here are the big ticket items before kang is a working proof of concept.
 Lots to do.
 
 - [ ] move kang.Package.IsStale off kang.Package; someone who holds a Package value should use pkg.NotStale, setting it should be a property of the package loader.
-- [ ] detect `.kangfile` and parse contents (format will probably reuse gb's depfile parsing logic; the requirement is **must** be supported by the Go std lib and **must** support comments).
+- [ ] ~~detect `.kangfile`~~ and parse contents (format will probably reuse gb's depfile parsing logic; the requirement is **must** be supported by the Go std lib and **must** support comments).
 - [ ] detect source of a project (currently hard coded in `cmd/kang/main.go`)
 - [ ] unit tests
 - [ ] functional and integration tests
