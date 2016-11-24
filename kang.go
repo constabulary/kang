@@ -239,7 +239,7 @@ func Compile(pkg *Package) error {
 func Link(pkg *Package) error {
 	// to ensure we don't write a partial binary, link the binary to a temporary file in
 	// in the target directory, then rename.
-	tmp, err := ioutil.TempFile(pkg.Workdir, ".kang-link")
+	tmp, err := ioutil.TempFile(filepath.Dir(pkg.Binfile()), ".kang-link")
 	if err != nil {
 		return err
 	}

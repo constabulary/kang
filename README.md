@@ -49,7 +49,7 @@ _note_: not done, see roadmap and TODO.
 `kang build` will build all the source in a project, it can be issued anywhere in the project.
 `kang test` will test all the packages in a project, ditto.
 
-Both commands (will) automatically fetch dependencies if they are no present inside the project (location to be determined, probably `.kang/src`)
+Both commands (will) automatically fetch dependencies if they are not present inside the project (location to be determined, probably `.kang/src`)
 Both commands automatically cache as much as possible for fast incremental compilation.
 
 ## Roadmap
