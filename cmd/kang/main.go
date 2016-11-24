@@ -41,16 +41,22 @@ func main() {
 
 	pkg := &kang.Package{
 		Context:    ctx,
+		ImportPath: "github.com/constabulary/kang",
+		Dir:        rootdir,
+		GoFiles:    []string{"kang.go"},
+	}
+	pkg.NotStale = !pkg.IsStale()
+
+	pkg = &kang.Package{
+		Context:    ctx,
 		ImportPath: "github.com/constabulary/cmd/kang",
 		Main:       true,
 		Dir:        filepath.Join(rootdir, "cmd", "kang"),
 		GoFiles:    []string{"main.go"},
-		Imports: []*kang.Package{{
-			Context:    ctx,
-			ImportPath: "github.com/constabulary/kang",
-			Dir:        rootdir,
-			GoFiles:    []string{"kang.go"},
-		}}}
+		Imports:    []*kang.Package{pkg},
+	}
+
+	pkg.NotStale = !pkg.IsStale()
 
 	build(pkg)
 }
@@ -91,7 +97,7 @@ func buildPackage(targets map[string]func() error, pkg *kang.Package) (func() er
 	// step 0. are we stale ?
 	// if this package is not stale, then by definition none of its
 	// dependencies are stale, so ignore this whole tree.
-	if !pkg.IsStale() {
+	if pkg.NotStale {
 		return func() error {
 			fmt.Println(pkg.ImportPath, "is up to date")
 			return nil

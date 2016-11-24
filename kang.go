@@ -54,6 +54,7 @@ type Package struct {
 	standard   bool // is this part of the stdlib
 	testScope  bool // is a test scoped packge
 	Main       bool // this is a command
+	NotStale   bool // this package _and_ all its dependencies are not stale
 }
 
 const debug = true
