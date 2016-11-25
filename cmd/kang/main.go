@@ -65,30 +65,14 @@ func main() {
 	case "build":
 		srcs := loadSources(prefix, rootdir)
 		for _, src := range srcs {
-			fmt.Println("loaded", src.ImportPath, "(", src.Name, ")")
+			fmt.Printf("loaded %s (%s)\n", src.ImportPath, src.Name)
 		}
 
-		pkg := &kang.Package{
-			Context:    ctx,
-			ImportPath: prefix,
-			Dir:        rootdir,
-			GoFiles:    []string{"kang.go"},
-		}
-
-		main := &kang.Package{
-			Context:    ctx,
-			ImportPath: path.Join(prefix, "cmd", "kang"),
-			Main:       true,
-			Dir:        filepath.Join(rootdir, "cmd", "kang"),
-			GoFiles:    []string{"main.go", "kangfile.go"},
-			Imports:    []*kang.Package{pkg},
-		}
-
-		computeStale(main)
+		pkgs := transform(ctx, srcs...)
+		computeStale(pkgs...)
 
 		targets := make(map[string]func() error)
-
-		fn, err := buildPackages(targets, main)
+		fn, err := buildPackages(targets, pkgs...)
 		check(err)
 		check(fn())
 	default:
@@ -100,6 +84,50 @@ func cwd() string {
 	wd, err := os.Getwd()
 	check(err)
 	return wd
+}
+
+// transform takes a slice of go/build.Package and returns the
+// corresponding slice of kang.Packages.
+func transform(ctx *kang.Context, v ...*build.Package) []*kang.Package {
+	srcs := make(map[string]*build.Package)
+	for _, pkg := range v {
+		srcs[pkg.ImportPath] = pkg
+	}
+
+	var pkgs []*kang.Package
+	seen := make(map[string]bool)
+
+	var walk func(src *build.Package)
+	walk = func(src *build.Package) {
+		if seen[src.ImportPath] {
+			return
+		}
+		seen[src.ImportPath] = true
+
+		for _, i := range src.Imports {
+			if stdlib[i] {
+				// skip stdlib package
+				continue
+			}
+			pkg, ok := srcs[i]
+			if !ok {
+				fatal("transform: pkg ", i, "is not loaded")
+			}
+			walk(pkg)
+		}
+
+		pkgs = append(pkgs, &kang.Package{
+			Context:    ctx,
+			ImportPath: src.ImportPath,
+			Dir:        src.Dir,
+			GoFiles:    src.GoFiles,
+			Main:       src.Name == "main",
+		})
+	}
+	for _, p := range v {
+		walk(p)
+	}
+	return pkgs
 }
 
 // computeStale sets the UpToDate flag on a set of package roots.
