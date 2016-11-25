@@ -89,7 +89,7 @@ func main() {
 
 		targets := make(map[string]func() error)
 
-		fn, err := buildPackages(targets, pkg)
+		fn, err := buildPackages(targets, main)
 		check(err)
 		check(fn())
 	default:
