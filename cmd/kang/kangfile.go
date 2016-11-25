@@ -1,5 +1,4 @@
-// kangfile loads a file of tagged key value pairs.
-package kangfile
+package main
 
 import (
 	"bufio"
@@ -8,6 +7,8 @@ import (
 	"os"
 	"strings"
 )
+
+// kangfile loads a file of tagged key value pairs.
 
 // ParseFile parses path into a tagged key value map.
 // See Parse for the syntax of the file.

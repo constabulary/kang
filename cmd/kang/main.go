@@ -9,7 +9,6 @@ import (
 	"runtime"
 
 	"github.com/constabulary/kang"
-	"github.com/constabulary/kang/cmd/kang/internal/kangfile"
 )
 
 func check(err error) {
@@ -29,7 +28,7 @@ func main() {
 
 	fmt.Println("Using", kf)
 
-	_, err = kangfile.ParseFile(kf)
+	_, err = ParseFile(kf)
 	check(err)
 
 	workdir, err := ioutil.TempDir("", "kang")
@@ -54,21 +53,13 @@ func main() {
 	}
 	pkg.NotStale = !pkg.IsStale()
 
-	kangfile := &kang.Package{
-		Context:    ctx,
-		ImportPath: "github.com/constabulary/kang/cmd/kang/internal/kangfile",
-		Dir:        filepath.Join(rootdir, "cmd", "kang", "internal", "kangfile"),
-		GoFiles:    []string{"kangfile.go"},
-	}
-	kangfile.NotStale = !kangfile.IsStale()
-
 	main := &kang.Package{
 		Context:    ctx,
 		ImportPath: "github.com/constabulary/cmd/kang",
 		Main:       true,
 		Dir:        filepath.Join(rootdir, "cmd", "kang"),
-		GoFiles:    []string{"main.go"},
-		Imports:    []*kang.Package{pkg, kangfile},
+		GoFiles:    []string{"main.go", "kangfile.go"},
+		Imports:    []*kang.Package{pkg},
 	}
 
 	main.NotStale = !main.IsStale()
