@@ -74,7 +74,6 @@ func main() {
 			Dir:        rootdir,
 			GoFiles:    []string{"kang.go"},
 		}
-		pkg.NotStale = !pkg.IsStale()
 
 		main := &kang.Package{
 			Context:    ctx,
@@ -85,7 +84,7 @@ func main() {
 			Imports:    []*kang.Package{pkg},
 		}
 
-		main.NotStale = !main.IsStale()
+		computeStale(main)
 
 		targets := make(map[string]func() error)
 
@@ -101,6 +100,34 @@ func cwd() string {
 	wd, err := os.Getwd()
 	check(err)
 	return wd
+}
+
+// computeStale sets the UpToDate flag on a set of package roots.
+func computeStale(roots ...*kang.Package) {
+	seen := make(map[*kang.Package]bool)
+
+	var walk func(pkg *kang.Package) bool
+	walk = func(pkg *kang.Package) bool {
+		if seen[pkg] {
+			return pkg.NotStale
+		}
+		seen[pkg] = true
+
+		for _, i := range pkg.Imports {
+			if !walk(i) {
+				// a dep is stale so we are stale
+				return false
+			}
+		}
+
+		stale := pkg.IsStale()
+		pkg.NotStale = !stale
+		return !stale
+	}
+
+	for _, root := range roots {
+		walk(root)
+	}
 }
 
 // findkangfile returns the location of the closest .kangfile
