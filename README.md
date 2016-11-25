@@ -92,7 +92,7 @@ Lots to do.
 
 - [ ] move kang.Package.IsStale off kang.Package; someone who holds a Package value should use pkg.NotStale, setting it should be a property of the package loader.
 - [x] detect `.kangfile` and parse contents (format will probably reuse gb's depfile parsing logic; the requirement is **must** be supported by the Go std lib and **must** support comments).
-- [ ] detect source of a project (currently hard coded in `cmd/kang/main.go`)
+- [x] detect source of a project (currently hard coded in `cmd/kang/main.go`)
 - [ ] unit tests
 - [ ] functional and integration tests
 - [ ] kang has forked a number of gb components, merge the changes required back into gb so both kang and gb use the same build and test primatives.

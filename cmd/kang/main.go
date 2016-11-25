@@ -3,11 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"go/build"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/constabulary/kang"
 )
@@ -57,26 +59,42 @@ func main() {
 		Bindir:  rootdir,
 	}
 
-	pkg := &kang.Package{
-		Context:    ctx,
-		ImportPath: prefix,
-		Dir:        rootdir,
-		GoFiles:    []string{"kang.go"},
+	action := "build"
+
+	switch action {
+	case "build":
+		srcs := loadSources(prefix, rootdir)
+		for _, src := range srcs {
+			fmt.Println("loaded", src.ImportPath, "(", src.Name, ")")
+		}
+
+		pkg := &kang.Package{
+			Context:    ctx,
+			ImportPath: prefix,
+			Dir:        rootdir,
+			GoFiles:    []string{"kang.go"},
+		}
+		pkg.NotStale = !pkg.IsStale()
+
+		main := &kang.Package{
+			Context:    ctx,
+			ImportPath: path.Join(prefix, "cmd", "kang"),
+			Main:       true,
+			Dir:        filepath.Join(rootdir, "cmd", "kang"),
+			GoFiles:    []string{"main.go", "kangfile.go"},
+			Imports:    []*kang.Package{pkg},
+		}
+
+		main.NotStale = !main.IsStale()
+
+		targets := make(map[string]func() error)
+
+		fn, err := buildPackages(targets, pkg)
+		check(err)
+		check(fn())
+	default:
+		fatal("unknown action:", action)
 	}
-	pkg.NotStale = !pkg.IsStale()
-
-	main := &kang.Package{
-		Context:    ctx,
-		ImportPath: path.Join(prefix, "cmd", "kang"),
-		Main:       true,
-		Dir:        filepath.Join(rootdir, "cmd", "kang"),
-		GoFiles:    []string{"main.go", "kangfile.go"},
-		Imports:    []*kang.Package{pkg},
-	}
-
-	main.NotStale = !main.IsStale()
-
-	build(main)
 }
 
 func cwd() string {
@@ -108,15 +126,7 @@ func findkangfile(dir string) (string, error) {
 	}
 }
 
-func build(pkgs ...*kang.Package) {
-	targets := make(map[string]func() error)
-
-	fn, err := buildPackages(targets, pkgs)
-	check(err)
-	check(fn())
-}
-
-func buildPackages(targets map[string]func() error, pkgs []*kang.Package) (func() error, error) {
+func buildPackages(targets map[string]func() error, pkgs ...*kang.Package) (func() error, error) {
 	var deps []func() error
 	for _, pkg := range pkgs {
 		fn, err := buildPackage(targets, pkg)
@@ -182,4 +192,39 @@ func buildPackage(targets map[string]func() error, pkg *kang.Package) (func() er
 	targets[pkg.ImportPath] = build
 
 	return build, nil
+}
+
+func loadSources(prefix string, dir string) []*build.Package {
+	f, err := os.Open(dir)
+	check(err)
+	files, err := f.Readdir(-1)
+	check(err)
+	f.Close()
+
+	var srcs []*build.Package
+	for _, fi := range files {
+		name := fi.Name()
+		if strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".") || name == "testdata" || name == "vendor" {
+			// ignore it
+			continue
+		}
+		if fi.IsDir() {
+			srcs = append(srcs, loadSources(path.Join(prefix, name), filepath.Join(dir, name))...)
+		}
+	}
+
+	pkg, err := build.ImportDir(dir, 0)
+	switch err := err.(type) {
+	case nil:
+		// ImportDir does not know the import path for this package
+		// but we know the prefix, so fix it.
+		pkg.ImportPath = prefix
+		srcs = append(srcs, pkg)
+	case (*build.NoGoError):
+		// do nothing
+	default:
+		check(err)
+	}
+
+	return srcs
 }
