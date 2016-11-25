@@ -1,1 +1,2 @@
-. name=github.com/constabulary/kang
+# prefix is the import path prefix for this project
+project prefix=github.com/constabulary/kang

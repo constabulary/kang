@@ -68,7 +68,7 @@ Here are the big ticket items before kang is a working proof of concept.
 Lots to do.
 
 - [ ] move kang.Package.IsStale off kang.Package; someone who holds a Package value should use pkg.NotStale, setting it should be a property of the package loader.
-- [ ] ~~detect `.kangfile`~~ and parse contents (format will probably reuse gb's depfile parsing logic; the requirement is **must** be supported by the Go std lib and **must** support comments).
+- [x] detect `.kangfile` and parse contents (format will probably reuse gb's depfile parsing logic; the requirement is **must** be supported by the Go std lib and **must** support comments).
 - [ ] detect source of a project (currently hard coded in `cmd/kang/main.go`)
 - [ ] unit tests
 - [ ] functional and integration tests

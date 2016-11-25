@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 
@@ -13,28 +14,39 @@ import (
 
 func check(err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "fatal: %+v\n", err)
+		fatal(err)
 		os.Exit(1)
 	}
 }
 
+func fatal(arg interface{}, args ...interface{}) {
+	fmt.Fprint(os.Stderr, "fatal: ", arg)
+	fmt.Fprintln(os.Stderr, args...)
+	os.Exit(1)
+}
+
 func main() {
 	flag.Parse()
-	kf, err := findkangfile(cwd())
+	f, err := findkangfile(cwd())
 	check(err)
 
-	kf, err = filepath.Abs(kf)
+	f, err = filepath.Abs(f)
 	check(err)
 
-	fmt.Println("Using", kf)
+	fmt.Println("Using", f)
 
-	_, err = ParseFile(kf)
+	kf, err := ParseFile(f)
 	check(err)
+
+	prefix, ok := kf["project"]["prefix"]
+	if prefix == "" || !ok {
+		fatal("project prefix missing from .kangfile")
+	}
 
 	workdir, err := ioutil.TempDir("", "kang")
 	check(err)
 
-	rootdir := filepath.Dir(kf)
+	rootdir := filepath.Dir(f)
 	pkgdir := filepath.Join(rootdir, ".kang", "pkg")
 
 	ctx := &kang.Context{
@@ -47,7 +59,7 @@ func main() {
 
 	pkg := &kang.Package{
 		Context:    ctx,
-		ImportPath: "github.com/constabulary/kang",
+		ImportPath: prefix,
 		Dir:        rootdir,
 		GoFiles:    []string{"kang.go"},
 	}
@@ -55,7 +67,7 @@ func main() {
 
 	main := &kang.Package{
 		Context:    ctx,
-		ImportPath: "github.com/constabulary/cmd/kang",
+		ImportPath: path.Join(prefix, "cmd", "kang"),
 		Main:       true,
 		Dir:        filepath.Join(rootdir, "cmd", "kang"),
 		GoFiles:    []string{"main.go", "kangfile.go"},
