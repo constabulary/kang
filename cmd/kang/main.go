@@ -9,6 +9,7 @@ import (
 	"runtime"
 
 	"github.com/constabulary/kang"
+	"github.com/constabulary/kang/cmd/kang/internal/kangfile"
 )
 
 func check(err error) {
@@ -20,18 +21,21 @@ func check(err error) {
 
 func main() {
 	flag.Parse()
-	kangfile, err := findkangfile(cwd())
+	kf, err := findkangfile(cwd())
 	check(err)
 
-	kangfile, err = filepath.Abs(kangfile)
+	kf, err = filepath.Abs(kf)
 	check(err)
 
-	fmt.Println("Using", kangfile)
+	fmt.Println("Using", kf)
+
+	_, err = kangfile.ParseFile(kf)
+	check(err)
 
 	workdir, err := ioutil.TempDir("", "kang")
 	check(err)
 
-	rootdir := filepath.Dir(kangfile)
+	rootdir := filepath.Dir(kf)
 	pkgdir := filepath.Join(rootdir, ".kang", "pkg")
 
 	ctx := &kang.Context{
@@ -50,18 +54,26 @@ func main() {
 	}
 	pkg.NotStale = !pkg.IsStale()
 
-	pkg = &kang.Package{
+	kangfile := &kang.Package{
+		Context:    ctx,
+		ImportPath: "github.com/constabulary/kang/cmd/kang/internal/kangfile",
+		Dir:        filepath.Join(rootdir, "cmd", "kang", "internal", "kangfile"),
+		GoFiles:    []string{"kangfile.go"},
+	}
+	kangfile.NotStale = !kangfile.IsStale()
+
+	main := &kang.Package{
 		Context:    ctx,
 		ImportPath: "github.com/constabulary/cmd/kang",
 		Main:       true,
 		Dir:        filepath.Join(rootdir, "cmd", "kang"),
 		GoFiles:    []string{"main.go"},
-		Imports:    []*kang.Package{pkg},
+		Imports:    []*kang.Package{pkg, kangfile},
 	}
 
-	pkg.NotStale = !pkg.IsStale()
+	main.NotStale = !main.IsStale()
 
-	build(pkg)
+	build(main)
 }
 
 func cwd() string {
