@@ -33,6 +33,29 @@ Seeing as a manfiest file, the `.kangfile` is required, kang puts other useful t
 
 The location of the `.kangfile` determines the root of a project, which is usually (but not required to be) the root of the project's repository, simliar to gb walking up the directory tree to find `src/` or git doing the same for `.git/`. 
 
+### .kangfile contents
+
+A project's `.kangfile` contains one or more lines of the format
+
+    name key=value [key=value]...
+
+Elements can be separated by whitespace (space and tab).
+Lines that do not begin with a letter or number are ignored.
+This provides a simple mechanism for commentary
+
+Each `.kangfile` must contain a line donating the import path prefix, or root, for this project.
+
+    # This project's import path prefix
+    project	prefix=github.com/constabulary/kang
+
+    # some comment
+    github.com/pkg/profile version=0.1.0
+
+    ; some other comment
+    // third kind of comment
+     lines starting with blank lines are also ignored
+    github.com/pkg/sftp version=0.2.1
+
 ## Installation
 
 kang requires Go 1.7.3 or later.
