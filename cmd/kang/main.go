@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha1"
 	"flag"
 	"fmt"
 	"go/build"
@@ -67,6 +68,8 @@ func main() {
 		for _, src := range srcs {
 			fmt.Printf("loaded %s (%s)\n", src.ImportPath, src.Name)
 		}
+
+		srcs = loadDependencies(rootdir, kf, srcs...)
 
 		pkgs := transform(ctx, srcs...)
 		computeStale(pkgs...)
@@ -281,5 +284,106 @@ func loadSources(prefix string, dir string) []*build.Package {
 		check(err)
 	}
 
+	return srcs
+}
+
+func loadDependencies(rootdir string, m map[string]map[string]string, srcs ...*build.Package) []*build.Package {
+	load := func(path string) *build.Package { fatal("cannot resolve path ", path); return nil }
+	for prefix, d := range m {
+		if prefix == "project" {
+			// skip kang metadata
+			continue
+		}
+		if version, ok := d["version"]; ok {
+			hash := sha1.Sum([]byte(prefix + "version=" + version))
+			prefix := prefix
+			dir := filepath.Join(rootdir, ".kang", "cache", fmt.Sprintf("%x", hash[0:1]), fmt.Sprintf("%x", hash[1:]))
+			next := load
+			fmt.Println("registered:", prefix, "@", version)
+			load = func(path string) *build.Package {
+				if !strings.HasPrefix(path, prefix) {
+					return next(path)
+				}
+				fmt.Println("searching", path, "in", prefix, "@", version)
+				dir := filepath.Join(dir, path)
+				_, err := os.Stat(dir)
+				if os.IsNotExist(err) {
+					check(err)
+				}
+				pkg, err := build.ImportDir(dir, 0)
+				switch err := err.(type) {
+				case nil:
+					// ImportDir does not know the import path for this package
+					// but we know the prefix, so fix it.
+					pkg.ImportPath = path
+					return pkg
+				case (*build.NoGoError):
+					// do nothing
+				default:
+					check(err)
+				}
+				return nil
+			}
+			continue
+		}
+		if tag, ok := d["tag"]; ok {
+			hash := sha1.Sum([]byte(prefix + "tag=" + tag))
+			prefix := prefix
+			dir := filepath.Join(rootdir, ".kang", "cache", fmt.Sprintf("%x", hash[0:1]), fmt.Sprintf("%x", hash[1:]))
+			next := load
+			fmt.Println("registered:", prefix, "@", tag)
+			load = func(path string) *build.Package {
+				if !strings.HasPrefix(path, prefix) {
+					return next(path)
+				}
+				fmt.Println("searching", path, "in", prefix, "@", tag)
+				dir := filepath.Join(dir, path)
+				_, err := os.Stat(dir)
+				if os.IsNotExist(err) {
+					check(err)
+				}
+				pkg, err := build.ImportDir(dir, 0)
+				switch err := err.(type) {
+				case nil:
+					// ImportDir does not know the import path for this package
+					// but we know the prefix, so fix it.
+					pkg.ImportPath = path
+					return pkg
+				case (*build.NoGoError):
+					// do nothing
+				default:
+					check(err)
+				}
+				return nil
+			}
+			continue
+		}
+		fatal("unknoww dependency", d)
+	}
+
+	seen := make(map[string]bool)
+	var walk func(string)
+	walk = func(path string) {
+		if stdlib[path] {
+			return
+		}
+		if seen[path] {
+			return
+		}
+		seen[path] = true
+		pkg := load(path)
+		srcs = append(srcs, pkg)
+		for _, i := range pkg.Imports {
+			walk(i)
+		}
+	}
+	for _, src := range srcs {
+		seen[src.ImportPath] = true
+	}
+	for _, src := range srcs[:] {
+		for _, i := range src.Imports {
+			walk(i)
+		}
+	}
 	return srcs
 }
