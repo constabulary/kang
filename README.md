@@ -56,6 +56,26 @@ Each `.kangfile` must contain a line donating the import path prefix, or root, f
      lines starting with blank lines are also ignored
     github.com/pkg/sftp version=0.2.1
 
+### Project dependencies
+
+kang requires that each external dependency be listed in the project `.kangfile`.
+
+This can be in one of three forms
+
+    # version=SEMVER
+    # Note, it's version=1.1.0, not version=v1.1.0
+    github.com/fatih/color          version=1.1.0
+
+    # tag=TAG
+    github.com/mattn/go-colorable   tag=0.0.6
+
+    # commit=SHA1
+    golang.org/x/net                commit=4971afd
+
+This will cause kang to search its cache, sorted in `.kang/cache` for the source of each dependency 
+
+_Note_: Automatic fetching of missing dependencies is not yet implemented.
+
 ## Installation
 
 kang requires Go 1.7.3 or later.
