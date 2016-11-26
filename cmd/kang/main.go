@@ -295,99 +295,15 @@ func loadDependencies(rootdir string, m map[string]map[string]string, srcs ...*b
 			continue
 		}
 		if version, ok := d["version"]; ok {
-			hash := sha1.Sum([]byte(prefix + "version=" + version))
-			prefix := prefix
-			dir := filepath.Join(rootdir, ".kang", "cache", fmt.Sprintf("%x", hash[0:1]), fmt.Sprintf("%x", hash[1:]))
-			next := load
-			fmt.Println("registered:", prefix, "@", version)
-			load = func(path string) *build.Package {
-				if !strings.HasPrefix(path, prefix) {
-					return next(path)
-				}
-				fmt.Println("searching", path, "in", prefix, "@", version)
-				dir := filepath.Join(dir, path)
-				_, err := os.Stat(dir)
-				if os.IsNotExist(err) {
-					check(err)
-				}
-				pkg, err := build.ImportDir(dir, 0)
-				switch err := err.(type) {
-				case nil:
-					// ImportDir does not know the import path for this package
-					// but we know the prefix, so fix it.
-					pkg.ImportPath = path
-					return pkg
-				case (*build.NoGoError):
-					// do nothing
-				default:
-					check(err)
-				}
-				return nil
-			}
+			load = register(rootdir, prefix, "version", version, load)
 			continue
 		}
 		if tag, ok := d["tag"]; ok {
-			hash := sha1.Sum([]byte(prefix + "tag=" + tag))
-			prefix := prefix
-			dir := filepath.Join(rootdir, ".kang", "cache", fmt.Sprintf("%x", hash[0:1]), fmt.Sprintf("%x", hash[1:]))
-			next := load
-			fmt.Println("registered:", prefix, "@", tag)
-			load = func(path string) *build.Package {
-				if !strings.HasPrefix(path, prefix) {
-					return next(path)
-				}
-				fmt.Println("searching", path, "in", prefix, "@", tag)
-				dir := filepath.Join(dir, path)
-				_, err := os.Stat(dir)
-				if os.IsNotExist(err) {
-					check(err)
-				}
-				pkg, err := build.ImportDir(dir, 0)
-				switch err := err.(type) {
-				case nil:
-					// ImportDir does not know the import path for this package
-					// but we know the prefix, so fix it.
-					pkg.ImportPath = path
-					return pkg
-				case (*build.NoGoError):
-					// do nothing
-				default:
-					check(err)
-				}
-				return nil
-			}
+			load = register(rootdir, prefix, "tag", tag, load)
 			continue
 		}
 		if commit, ok := d["commit"]; ok {
-			hash := sha1.Sum([]byte(prefix + "commit=" + commit))
-			prefix := prefix
-			dir := filepath.Join(rootdir, ".kang", "cache", fmt.Sprintf("%x", hash[0:1]), fmt.Sprintf("%x", hash[1:]))
-			next := load
-			fmt.Println("registered:", prefix, "@", commit)
-			load = func(path string) *build.Package {
-				if !strings.HasPrefix(path, prefix) {
-					return next(path)
-				}
-				fmt.Println("searching", path, "in", prefix, "@", commit)
-				dir := filepath.Join(dir, path)
-				_, err := os.Stat(dir)
-				if os.IsNotExist(err) {
-					check(err)
-				}
-				pkg, err := build.ImportDir(dir, 0)
-				switch err := err.(type) {
-				case nil:
-					// ImportDir does not know the import path for this package
-					// but we know the prefix, so fix it.
-					pkg.ImportPath = path
-					return pkg
-				case (*build.NoGoError):
-					// do nothing
-				default:
-					check(err)
-				}
-				return nil
-			}
+			load = register(rootdir, prefix, "commit", commit, load)
 			continue
 		}
 		fatal("unknoww dependency", d)
@@ -418,4 +334,35 @@ func loadDependencies(rootdir string, m map[string]map[string]string, srcs ...*b
 		}
 	}
 	return srcs
+}
+
+func register(rootdir, prefix, kind, arg string, next func(string) *build.Package) func(string) *build.Package {
+	dir := cacheDir(rootdir, prefix+kind+"="+arg)
+	fmt.Println("registered:", prefix, "@", arg)
+	return func(path string) *build.Package {
+		if !strings.HasPrefix(path, prefix) {
+			return next(path)
+		}
+		fmt.Println("searching", path, "in", prefix, "@", arg)
+		dir := filepath.Join(dir, path)
+		_, err := os.Stat(dir)
+		if os.IsNotExist(err) {
+			check(err)
+		}
+		return importPath(path, dir)
+	}
+}
+
+func importPath(path, dir string) *build.Package {
+	pkg, err := build.ImportDir(dir, 0)
+	check(err)
+	// ImportDir does not know the import path for this package
+	// but we know the prefix, so fix it.
+	pkg.ImportPath = path
+	return pkg
+}
+
+func cacheDir(rootdir, key string) string {
+	hash := sha1.Sum([]byte(key))
+	return filepath.Join(rootdir, ".kang", "cache", fmt.Sprintf("%x", hash[0:1]), fmt.Sprintf("%x", hash[1:]))
 }
