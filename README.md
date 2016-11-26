@@ -10,8 +10,8 @@ Similarly many folks are frustrated with the `gb` project model, which gives you
 
 kang is an experiment to try to provide a solution that:
 
-a. lets you checkout a project anywhere you want
-b. does not force you to give up interoperability with go get.
+1. lets you checkout a project anywhere you want
+2. does not force you to give up interoperability with go get.
 
 ## .kangfile
 
