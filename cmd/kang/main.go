@@ -236,13 +236,13 @@ func buildPackage(targets map[string]func() error, pkg *kang.Package) (func() er
 				return err
 			}
 		}
-		if err := kang.Compile(pkg); err != nil {
+		if err := pkg.Compile(); err != nil {
 			return err
 		}
 		if !pkg.Main {
 			return nil // we're done
 		}
-		return kang.Link(pkg)
+		return pkg.Link()
 	}
 
 	// record the final action as the action that represents

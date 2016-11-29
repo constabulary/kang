@@ -208,7 +208,7 @@ func stringList(args ...[]string) []string {
 	return l
 }
 
-func Compile(pkg *Package) error {
+func (pkg *Package) Compile() error {
 	args := append(pkg.gcflags, "-p", pkg.ImportPath, "-pack")
 	args = append(args, "-o", pkg.pkgpath())
 	for _, d := range pkg.searchPaths() {
@@ -237,7 +237,7 @@ func Compile(pkg *Package) error {
 	return cmd.Run()
 }
 
-func Link(pkg *Package) error {
+func (pkg *Package) Link() error {
 	// to ensure we don't write a partial binary, link the binary to a temporary file in
 	// in the target directory, then rename.
 	tmp, err := ioutil.TempFile(filepath.Dir(pkg.Binfile()), ".kang-link")
